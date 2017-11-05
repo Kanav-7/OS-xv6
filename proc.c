@@ -88,7 +88,7 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
-
+  p->priority = 60;
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -323,18 +323,31 @@ void
 scheduler(void)
 {
   struct proc *p;
+  struct proc *p1;
   struct cpu *c = mycpu();
   c->proc = 0;
   
   for(;;){
     // Enable interrupts on this processor.
     sti();
-
+    struct proc *hp;
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state != RUNNABLE)
         continue;
+
+    //Priority cheduler implemented here
+      
+      hp = p;  
+      for(p1 = ptable.proc; p1 < &ptable.proc[NPROC]; p1++)
+      {
+        if(p1->state != RUNNABLE)
+          continue;
+        if(hp->priority > p1->priority)
+          hp = p1;
+      }
+      p = hp;
 
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
@@ -531,4 +544,64 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+//Implementing cps
+int 
+cps(void)
+{
+  struct proc *p;
+  sti(); //Enabling Interrupts
+
+  acquire(&ptable.lock);
+  cprintf("pid      Name      State      priority  \n");
+  //looping over processes in processs table
+  p=ptable.proc;
+
+  while(p< &ptable.proc[NPROC])
+  {
+    if( p->state == RUNNING)
+    {
+      cprintf("%d      %s      RUNNING      %d\n",p->pid,p->name,p->priority);
+    }
+    if( p->state == SLEEPING)
+    {
+      cprintf("%d      %s      SLEEPING      %d\n",p->pid,p->name,p->priority);
+    }
+    if( p->state == RUNNABLE)
+    {
+      cprintf("%d      %s      RUNNABLE      %d\n",p->pid,p->name,p->priority);
+    }
+
+    p++;
+  }
+
+  release(&ptable.lock);
+  return 22;
+
+}
+
+// Changing Priority
+
+int 
+cpr(int pid,int priority)
+{
+  struct proc *p;
+  acquire(&ptable.lock);
+  //looping over processes in processs table
+  p=ptable.proc;
+
+  while(p< &ptable.proc[NPROC])
+  {
+    if( p->pid == pid)
+    {
+      p->priority = priority;
+      break;
+    }
+    p++;
+  }
+
+  release(&ptable.lock);
+  return pid;
+
 }
